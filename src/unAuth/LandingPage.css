@@ -1,8 +1,18 @@
+:root {
+  --color-bg: #ede3db;
+  --color-primary: #b49504;
+  --color-secondary: #5b7fa3;
+  --color-accent: #1b3b36;
+  --color-text: #2d313a;
+}
+
 .landing-page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 /* Reset default margins and paddings */
@@ -17,6 +27,8 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 /* Smooth scrolling for anchor links */
@@ -30,16 +42,16 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--color-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-primary);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  background: var(--color-secondary);
 }
 
 /* Responsive design adjustments */
