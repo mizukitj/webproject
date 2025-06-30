@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import {
-  doc, setDoc, getDoc, onSnapshot, collection
+  doc, setDoc, getDoc, onSnapshot, collection, getDocs
 } from 'firebase/firestore';
 
 const TMDB_API_KEY = process.env.REACT_APP_TMDB_API_KEY;
@@ -35,6 +35,7 @@ const PartySession = () => {
   const [copied, setCopied] = useState(false);
   const [creatorId, setCreatorId] = useState(null);
   const [hasVoted, setHasVoted] = useState(false);
+  const [totalVoters, setTotalVoters] = useState(0);
   const userId = getUserId();
   const partyUrl = `${window.location.origin}/party/${partyId}`;
 
@@ -64,6 +65,18 @@ const PartySession = () => {
     });
     return () => unsub();
   }, [partyId]);
+
+  // Real-time results listener
+  useEffect(() => {
+    if (!lockedMovies) return;
+    
+    const votesCol = collection(db, 'parties', partyId, 'votes');
+    const unsub = onSnapshot(votesCol, async () => {
+      await fetchResults();
+    });
+    
+    return () => unsub();
+  }, [partyId, lockedMovies]);
 
   // On mount, if no creatorId, set it (first user is creator)
   useEffect(() => {
@@ -170,31 +183,34 @@ const PartySession = () => {
       await setDoc(votesDoc, { votes: newVotes }, { merge: true });
       setHasVoted(true);
       setShowResults(true);
-      fetchResults();
     }
   };
 
   // Fetch results (aggregate votes)
   const fetchResults = async () => {
+    if (!lockedMovies) return;
+    
     const votesCol = collection(db, 'parties', partyId, 'votes');
-    const snap = await getDoc(doc(db, 'parties', partyId));
-    let movieList = lockedMovies || (snap.data() && snap.data().lockedMovies) || [];
-    // Get all votes
-    const votesSnap = await (await import('firebase/firestore')).getDocs(votesCol);
+    const votesSnap = await getDocs(votesCol);
     const allVotes = [];
     votesSnap.forEach(doc => {
       allVotes.push(doc.data().votes);
     });
+    
+    setTotalVoters(allVotes.length);
+    
     // Tally votes
     const tally = {};
-    movieList.forEach(m => {
+    lockedMovies.forEach(m => {
       tally[m.id] = { ...m, like: 0, dislike: 0, pass: 0 };
     });
+    
     allVotes.forEach(voteObj => {
       Object.entries(voteObj).forEach(([movieId, v]) => {
         if (tally[movieId]) tally[movieId][v]++;
       });
     });
+    
     // Sort by likes desc, then passes, then dislikes
     const sorted = Object.values(tally).sort((a, b) => b.like - a.like || b.pass - a.pass || a.dislike - b.dislike);
     setResults(sorted);
@@ -209,16 +225,80 @@ const PartySession = () => {
   // UI
   if (showResults) {
     return (
-      <div style={{ textAlign: 'center', marginTop: '2rem', marginBottom: '5rem' }}>
-        <h2>Results</h2>
-        <button onClick={() => navigate(`/party/${partyId}`)} style={{ background: '#b49504', color: '#fff', fontWeight: 600, fontSize: '1rem', border: 'none', borderRadius: '20px', padding: '0.7em 1.5em', cursor: 'pointer', marginBottom: 24 }}>Back to Party</button>
+      <div style={{ textAlign: 'center', marginTop: '2rem', marginBottom: '5rem', padding: '0 1rem' }}>
+        <h2 style={{ color: '#333', marginBottom: '0.5rem' }}>🎬 Voting Results</h2>
+        <p style={{ color: '#666', marginBottom: '2rem' }}>{totalVoters} people voted</p>
+        
+        <button 
+          onClick={() => navigate(`/party/${partyId}`)} 
+          style={{ 
+            background: '#b49504', 
+            color: '#fff', 
+            fontWeight: 600, 
+            fontSize: '1rem', 
+            border: 'none', 
+            borderRadius: '20px', 
+            padding: '0.7em 1.5em', 
+            cursor: 'pointer', 
+            marginBottom: 24,
+            boxShadow: '0 2px 8px rgba(180, 149, 4, 0.3)'
+          }}
+        >
+          Back to Party
+        </button>
+        
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 24, marginTop: 32 }}>
           {results.map((movie, idx) => (
-            <div key={movie.id} style={{ width: 180, background: '#fff', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 8 }}>
-              <img src={movie.poster_path ? `https://image.tmdb.org/t/p/w300${movie.poster_path}` : 'https://via.placeholder.com/180x270?text=No+Image'} alt={movie.title} style={{ width: '100%', borderRadius: 8 }} />
-              <div style={{ fontWeight: 600, margin: '0.5em 0 0.2em 0' }}>{idx + 1}. {movie.title}</div>
-              <div style={{ fontSize: 14, color: '#888' }}>{movie.release_date ? movie.release_date.slice(0, 4) : ''}</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>👍 {movie.like} | ➖ {movie.pass} | 👎 {movie.dislike}</div>
+            <div key={movie.id} style={{ 
+              width: 200, 
+              background: '#fff', 
+              borderRadius: 16, 
+              boxShadow: '0 4px 16px rgba(0,0,0,0.1)', 
+              padding: 12,
+              border: idx === 0 ? '3px solid #ffd700' : '1px solid #eee',
+              position: 'relative'
+            }}>
+              {idx === 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: -10,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#ffd700',
+                  color: '#333',
+                  fontWeight: 'bold',
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  zIndex: 1
+                }}>
+                  🏆 WINNER
+                </div>
+              )}
+              <img 
+                src={movie.poster_path ? `https://image.tmdb.org/t/p/w300${movie.poster_path}` : 'https://via.placeholder.com/200x300?text=No+Image'} 
+                alt={movie.title} 
+                style={{ width: '100%', borderRadius: 12, marginBottom: '8px' }} 
+              />
+              <div style={{ fontWeight: 600, margin: '0.5em 0 0.2em 0', fontSize: '14px' }}>
+                #{idx + 1} {movie.title}
+              </div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: '8px' }}>
+                {movie.release_date ? movie.release_date.slice(0, 4) : ''}
+              </div>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                fontSize: 12, 
+                fontWeight: 500,
+                background: '#f8f9fa',
+                padding: '6px 8px',
+                borderRadius: '8px'
+              }}>
+                <span style={{ color: '#2ecc71' }}>👍 {movie.like}</span>
+                <span style={{ color: '#ffb300' }}>➖ {movie.pass}</span>
+                <span style={{ color: '#ff3a5e' }}>👎 {movie.dislike}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -229,52 +309,187 @@ const PartySession = () => {
   // Selection UI (creator only)
   if (showSelection && movies.length > 0 && userId === creatorId) {
     return (
-      <div style={{ textAlign: 'center', marginTop: '2rem', marginBottom: '5rem' }}>
-        <h2>Select Movies for the Party</h2>
-        <button onClick={() => setShowSelection(false)} style={{ background: '#b49504', color: '#fff', fontWeight: 600, fontSize: '1rem', border: 'none', borderRadius: '20px', padding: '0.7em 1.5em', cursor: 'pointer', marginBottom: 24 }}>Back to Filters</button>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 24, marginTop: 32 }}>
+      <div style={{ textAlign: 'center', marginTop: '2rem', marginBottom: '5rem', padding: '0 1rem' }}>
+        <h2 style={{ color: '#333', marginBottom: '1rem' }}>🎬 Select Movies for Voting</h2>
+        <p style={{ color: '#666', marginBottom: '2rem' }}>Choose the movies you want your friends to vote on</p>
+        
+        <button 
+          onClick={() => setShowSelection(false)} 
+          style={{ 
+            background: '#b49504', 
+            color: '#fff', 
+            fontWeight: 600, 
+            fontSize: '1rem', 
+            border: 'none', 
+            borderRadius: '20px', 
+            padding: '0.7em 1.5em', 
+            cursor: 'pointer', 
+            marginBottom: 24,
+            boxShadow: '0 2px 8px rgba(180, 149, 4, 0.3)'
+          }}
+        >
+          Back to Filters
+        </button>
+        
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 20, marginTop: 32 }}>
           {movies.map(movie => {
             const selected = selectedMovies.find(m => m.id === movie.id);
             return (
-              <div key={movie.id} style={{ width: 120, background: selected ? '#ffe082' : '#fff', borderRadius: 12, boxShadow: selected ? '0 2px 12px #b49504' : '0 2px 8px rgba(0,0,0,0.08)', padding: 6, cursor: 'pointer', border: selected ? '2px solid #b49504' : '2px solid transparent' }} onClick={() => toggleSelectMovie(movie)}>
-                <img src={movie.poster_path ? `https://image.tmdb.org/t/p/w300${movie.poster_path}` : 'https://via.placeholder.com/120x180?text=No+Image'} alt={movie.title} style={{ width: '100%', borderRadius: 8 }} />
-                <div style={{ fontWeight: 600, fontSize: 13, margin: '0.5em 0 0.2em 0' }}>{movie.title}</div>
-                <div style={{ fontSize: 12, color: '#888' }}>{movie.release_date ? movie.release_date.slice(0, 4) : ''}</div>
-                {selected && <div style={{ color: '#b49504', fontWeight: 700, fontSize: 12 }}>Selected</div>}
+              <div key={movie.id} style={{ 
+                width: 140, 
+                background: selected ? '#fff3cd' : '#fff', 
+                borderRadius: 12, 
+                boxShadow: selected ? '0 4px 16px rgba(180, 149, 4, 0.3)' : '0 2px 8px rgba(0,0,0,0.08)', 
+                padding: 8, 
+                cursor: 'pointer', 
+                border: selected ? '2px solid #b49504' : '2px solid transparent',
+                transition: 'all 0.2s ease'
+              }} 
+              onClick={() => toggleSelectMovie(movie)}
+              >
+                <img 
+                  src={movie.poster_path ? `https://image.tmdb.org/t/p/w300${movie.poster_path}` : 'https://via.placeholder.com/140x210?text=No+Image'} 
+                  alt={movie.title} 
+                  style={{ width: '100%', borderRadius: 8 }} 
+                />
+                <div style={{ fontWeight: 600, fontSize: 12, margin: '0.5em 0 0.2em 0', lineHeight: '1.2' }}>
+                  {movie.title}
+                </div>
+                <div style={{ fontSize: 11, color: '#888' }}>
+                  {movie.release_date ? movie.release_date.slice(0, 4) : ''}
+                </div>
+                {selected && (
+                  <div style={{ 
+                    color: '#b49504', 
+                    fontWeight: 700, 
+                    fontSize: 11, 
+                    marginTop: '4px',
+                    background: '#b49504',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: '8px',
+                    display: 'inline-block'
+                  }}>
+                    ✓ Selected
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-        <button onClick={lockInMovies} disabled={selectedMovies.length === 0} style={{ background: selectedMovies.length ? '#2ecc71' : '#ccc', color: '#fff', fontWeight: 600, fontSize: '1.1rem', border: 'none', borderRadius: '20px', padding: '0.7em 2em', cursor: selectedMovies.length ? 'pointer' : 'not-allowed', marginTop: 24 }}>Lock In {selectedMovies.length} Movies</button>
+        
+        <button 
+          onClick={lockInMovies} 
+          disabled={selectedMovies.length === 0} 
+          style={{ 
+            background: selectedMovies.length ? '#28a745' : '#ccc', 
+            color: '#fff', 
+            fontWeight: 600, 
+            fontSize: '1.1rem', 
+            border: 'none', 
+            borderRadius: '24px', 
+            padding: '0.8em 2em', 
+            cursor: selectedMovies.length ? 'pointer' : 'not-allowed', 
+            marginTop: 32,
+            boxShadow: selectedMovies.length ? '0 4px 16px rgba(40, 167, 69, 0.3)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          🔒 Lock In {selectedMovies.length} Movie{selectedMovies.length !== 1 ? 's' : ''}
+        </button>
       </div>
     );
   }
 
   return (
-    <div style={{ textAlign: 'center', marginTop: '2rem', marginBottom: '5rem' }}>
-      <h2>Party ID: {partyId}</h2>
-      <p>Share this link with your friends to join the party!</p>
-      <button onClick={copyLink} style={{ background: '#b49504', color: '#fff', fontWeight: 600, fontSize: '1rem', border: 'none', borderRadius: '20px', padding: '0.7em 1.5em', cursor: 'pointer', marginBottom: 12 }}>Copy Party Link</button>
-      {copied && <span style={{ color: '#2ecc71', marginLeft: 8 }}>Copied!</span>}
+    <div style={{ textAlign: 'center', marginTop: '2rem', marginBottom: '5rem', padding: '0 1rem' }}>
+      <h2 style={{ color: '#333', marginBottom: '0.5rem' }}>🎬 Movie Voting Party</h2>
+      <p style={{ color: '#666', marginBottom: '1rem' }}>Party ID: <strong>{partyId}</strong></p>
+      <p style={{ color: '#666', marginBottom: '2rem' }}>Share this link with your friends to join the party!</p>
+      
+      <button 
+        onClick={copyLink} 
+        style={{ 
+          background: '#b49504', 
+          color: '#fff', 
+          fontWeight: 600, 
+          fontSize: '1rem', 
+          border: 'none', 
+          borderRadius: '20px', 
+          padding: '0.7em 1.5em', 
+          cursor: 'pointer', 
+          marginBottom: 12,
+          boxShadow: '0 2px 8px rgba(180, 149, 4, 0.3)'
+        }}
+      >
+        📋 Copy Party Link
+      </button>
+      {copied && <span style={{ color: '#28a745', marginLeft: 8, fontWeight: '600' }}>✓ Copied!</span>}
+      
       {/* If movies are not locked, show filter/fetch UI for creator only */}
       {!lockedMovies && !showSelection && userId === creatorId && (
         <>
-          <div style={{ margin: '2rem auto', maxWidth: 400, background: '#f7f7f7', borderRadius: 12, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-            <h3>Filter Movies</h3>
-            <div style={{ marginBottom: 12 }}>
-              <label>Genre: </label>
-              <select name="genre" value={filters.genre} onChange={handleChange}>
-                <option value="">Any</option>
+          <div style={{ 
+            margin: '2rem auto', 
+            maxWidth: 400, 
+            background: '#f8f9fa', 
+            borderRadius: 16, 
+            padding: 24, 
+            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+            border: '1px solid #e9ecef'
+          }}>
+            <h3 style={{ color: '#333', marginBottom: '1rem' }}>🔍 Filter Movies</h3>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Genre: </label>
+              <select 
+                name="genre" 
+                value={filters.genre} 
+                onChange={handleChange}
+                style={{ 
+                  width: '100%', 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="">Any Genre</option>
                 {genres.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label>Year: </label>
-              <input name="year" type="number" min="1900" max={new Date().getFullYear()} value={filters.year} onChange={handleChange} style={{ width: 100 }} />
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Year: </label>
+              <input 
+                name="year" 
+                type="number" 
+                min="1900" 
+                max={new Date().getFullYear()} 
+                value={filters.year} 
+                onChange={handleChange} 
+                placeholder="Any year"
+                style={{ 
+                  width: '100%', 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }} 
+              />
             </div>
-            <div style={{ marginBottom: 12 }}>
-              <label>Language: </label>
-              <select name="language" value={filters.language} onChange={handleChange}>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Language: </label>
+              <select 
+                name="language" 
+                value={filters.language} 
+                onChange={handleChange}
+                style={{ 
+                  width: '100%', 
+                  padding: '8px 12px', 
+                  borderRadius: '8px', 
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              >
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
@@ -282,45 +497,169 @@ const PartySession = () => {
                 <option value="ja">Japanese</option>
                 <option value="ko">Korean</option>
                 <option value="zh">Chinese</option>
-                {/* Add more as needed */}
               </select>
             </div>
-            <button onClick={fetchMovies} style={{ background: '#b49504', color: '#fff', fontWeight: 600, fontSize: '1rem', border: 'none', borderRadius: '20px', padding: '0.7em 1.5em', cursor: 'pointer', marginTop: 8 }}>Fetch Movies</button>
+            <button 
+              onClick={fetchMovies} 
+              disabled={loading}
+              style={{ 
+                background: '#b49504', 
+                color: '#fff', 
+                fontWeight: 600, 
+                fontSize: '1rem', 
+                border: 'none', 
+                borderRadius: '20px', 
+                padding: '0.7em 1.5em', 
+                cursor: loading ? 'not-allowed' : 'pointer', 
+                marginTop: 8,
+                width: '100%',
+                opacity: loading ? 0.7 : 1
+              }}
+            >
+              {loading ? '🔍 Searching...' : '🔍 Find Movies'}
+            </button>
           </div>
         </>
       )}
+      
       {/* If movies are locked, show voting UI for all users except creator (creator can return to selection) */}
       {lockedMovies && !showResults && (
         <>
-          <h3 style={{ marginTop: 32 }}>Vote for your favorites!</h3>
+          <h3 style={{ marginTop: 32, color: '#333' }}>🗳️ Vote for your favorites!</h3>
           {userId === creatorId && (
-            <button onClick={returnToSelection} style={{ background: '#b49504', color: '#fff', fontWeight: 600, fontSize: '1rem', border: 'none', borderRadius: '20px', padding: '0.7em 1.5em', cursor: 'pointer', marginBottom: 24 }}>Return to Selection</button>
+            <button 
+              onClick={returnToSelection} 
+              style={{ 
+                background: '#6c757d', 
+                color: '#fff', 
+                fontWeight: 600, 
+                fontSize: '1rem', 
+                border: 'none', 
+                borderRadius: '20px', 
+                padding: '0.7em 1.5em', 
+                cursor: 'pointer', 
+                marginBottom: 24,
+                boxShadow: '0 2px 8px rgba(108, 117, 125, 0.3)'
+              }}
+            >
+              ⚙️ Return to Selection
+            </button>
           )}
           {userId !== creatorId && hasVoted && (
             <div style={{ marginTop: 32 }}>
-              <h4>Thanks for voting!</h4>
-              <button onClick={goToResults} style={{ background: '#b49504', color: '#fff', fontWeight: 600, fontSize: '1rem', border: 'none', borderRadius: '20px', padding: '0.7em 1.5em', cursor: 'pointer', marginTop: 8 }}>See Results</button>
+              <h4 style={{ color: '#28a745' }}>✅ Thanks for voting!</h4>
+              <button 
+                onClick={goToResults} 
+                style={{ 
+                  background: '#b49504', 
+                  color: '#fff', 
+                  fontWeight: 600, 
+                  fontSize: '1rem', 
+                  border: 'none', 
+                  borderRadius: '20px', 
+                  padding: '0.7em 1.5em', 
+                  cursor: 'pointer', 
+                  marginTop: 8,
+                  boxShadow: '0 2px 8px rgba(180, 149, 4, 0.3)'
+                }}
+              >
+                📊 See Results
+              </button>
             </div>
           )}
           {userId !== creatorId && !hasVoted && votingIndex < lockedMovies.length && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 32 }}>
-              <div style={{ width: 260, background: '#fff', borderRadius: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 12 }}>
-                <img src={lockedMovies[votingIndex].poster_path ? `https://image.tmdb.org/t/p/w300${lockedMovies[votingIndex].poster_path}` : 'https://via.placeholder.com/260x390?text=No+Image'} alt={lockedMovies[votingIndex].title} style={{ width: '100%', borderRadius: 12 }} />
-                <div style={{ fontWeight: 600, fontSize: 18, margin: '0.5em 0 0.2em 0' }}>{lockedMovies[votingIndex].title}</div>
-                <div style={{ fontSize: 15, color: '#888' }}>{lockedMovies[votingIndex].release_date ? lockedMovies[votingIndex].release_date.slice(0, 4) : ''}</div>
+              <div style={{ 
+                width: 280, 
+                background: '#fff', 
+                borderRadius: 20, 
+                boxShadow: '0 8px 32px rgba(0,0,0,0.12)', 
+                padding: 16,
+                border: '1px solid #e9ecef'
+              }}>
+                <img 
+                  src={lockedMovies[votingIndex].poster_path ? `https://image.tmdb.org/t/p/w300${lockedMovies[votingIndex].poster_path}` : 'https://via.placeholder.com/280x420?text=No+Image'} 
+                  alt={lockedMovies[votingIndex].title} 
+                  style={{ width: '100%', borderRadius: 16, marginBottom: '12px' }} 
+                />
+                <div style={{ fontWeight: 600, fontSize: 18, margin: '0.5em 0 0.2em 0', color: '#333' }}>
+                  {lockedMovies[votingIndex].title}
+                </div>
+                <div style={{ fontSize: 15, color: '#666', marginBottom: '16px' }}>
+                  {lockedMovies[votingIndex].release_date ? lockedMovies[votingIndex].release_date.slice(0, 4) : ''}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 24, marginTop: 24 }}>
-                <button className="action-btn dislike" style={{ fontSize: 28, width: 56, height: 56, borderRadius: '50%', background: '#fff', color: '#ff3a5e', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={() => handleVote('dislike')}>✖️</button>
-                <button className="action-btn pass" style={{ fontSize: 28, width: 56, height: 56, borderRadius: '50%', background: '#fff', color: '#ffb300', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={() => handleVote('pass')}>➖</button>
-                <button className="action-btn like" style={{ fontSize: 28, width: 56, height: 56, borderRadius: '50%', background: '#fff', color: '#2ecc71', border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer' }} onClick={() => handleVote('like')}>💚</button>
+                <button 
+                  className="action-btn dislike" 
+                  style={{ 
+                    fontSize: 32, 
+                    width: 64, 
+                    height: 64, 
+                    borderRadius: '50%', 
+                    background: '#fff', 
+                    color: '#ff3a5e', 
+                    border: '2px solid #ff3a5e', 
+                    boxShadow: '0 4px 16px rgba(255, 58, 94, 0.2)', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }} 
+                  onClick={() => handleVote('dislike')}
+                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                >
+                  ❌
+                </button>
+                <button 
+                  className="action-btn pass" 
+                  style={{ 
+                    fontSize: 32, 
+                    width: 64, 
+                    height: 64, 
+                    borderRadius: '50%', 
+                    background: '#fff', 
+                    color: '#ffb300', 
+                    border: '2px solid #ffb300', 
+                    boxShadow: '0 4px 16px rgba(255, 179, 0, 0.2)', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }} 
+                  onClick={() => handleVote('pass')}
+                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                >
+                  ➖
+                </button>
+                <button 
+                  className="action-btn like" 
+                  style={{ 
+                    fontSize: 32, 
+                    width: 64, 
+                    height: 64, 
+                    borderRadius: '50%', 
+                    background: '#fff', 
+                    color: '#2ecc71', 
+                    border: '2px solid #2ecc71', 
+                    boxShadow: '0 4px 16px rgba(46, 204, 113, 0.2)', 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }} 
+                  onClick={() => handleVote('like')}
+                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                >
+                  ❤️
+                </button>
               </div>
-              <div style={{ marginTop: 16, fontSize: 14, color: '#888' }}>Movie {votingIndex + 1} of {lockedMovies.length}</div>
+              <div style={{ marginTop: 16, fontSize: 14, color: '#666', fontWeight: '500' }}>
+                Movie {votingIndex + 1} of {lockedMovies.length}
+              </div>
             </div>
           )}
         </>
       )}
-      {loading && <div>Loading...</div>}
-      {error && <div style={{ color: 'red' }}>{error}</div>}
+      {loading && <div style={{ marginTop: '2rem', fontSize: '16px', color: '#666' }}>⏳ Loading...</div>}
+      {error && <div style={{ marginTop: '2rem', color: '#dc3545', fontWeight: '500' }}>❌ {error}</div>}
     </div>
   );
 };
