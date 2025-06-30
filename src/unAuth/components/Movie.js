@@ -61,36 +61,27 @@ const Movie = () => {
   };
 
   return (
-    <section className="movie-section">
+    <div className="tinder-card-container">
       <div
-        className="movie-card-tinder"
+        className="tinder-card"
         style={{ backgroundImage: `url(${movie.image})` }}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <div className="movie-info-tinder">
-          <div className="movie-main-info">
-            <h2>{movie.title} <span className="movie-year">{movie.year}</span></h2>
-            <div className="movie-origin">{movie.origin}</div>
-            <div className="movie-genre-rating">
-              <span className="movie-genre">{movie.genre}</span>
-              <span className="movie-rating">⭐ {movie.rating}</span>
-            </div>
-          </div>
-          <div className="movie-actions">
-            <button className="movie-btn no" onClick={handleNo} aria-label="No">
-              <i className="fas fa-times"></i>
-            </button>
-            <button className="movie-btn pass" onClick={handlePass} aria-label="Pass">
-              <i className="fas fa-minus"></i>
-            </button>
-            <button className="movie-btn yes" onClick={handleYes} aria-label="Yes">
-              <i className="fas fa-heart"></i>
-            </button>
+        <div className="tinder-card-gradient">
+          <div className="tinder-card-info">
+            <h2>{movie.title} <span>{movie.year}</span></h2>
+            <div className="tinder-card-meta">{movie.origin} &bull; {movie.genre}</div>
+            <div className="tinder-card-rating">⭐ {movie.rating}</div>
           </div>
         </div>
       </div>
-    </section>
+      <div className="tinder-card-actions">
+        <button className="action-btn dislike" onClick={handleNo} aria-label="Dislike">✖️</button>
+        <button className="action-btn pass" onClick={handlePass} aria-label="Pass">➖</button>
+        <button className="action-btn like" onClick={handleYes} aria-label="Like">💚</button>
+      </div>
+    </div>
   );
 };
 

@@ -1,153 +1,105 @@
-.movie-section {
-  height: 75vh;
+.tinder-card-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  position: relative;
-  overflow: hidden;
+  min-height: 100vh;
+  background: #f5f6fa;
 }
 
-.movie-card-tinder {
-  width: 100%;
-  height: 100%;
+.tinder-card {
+  width: 340px;
+  height: 480px;
   background-size: cover;
   background-position: center;
   border-radius: 24px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.25);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
   position: relative;
   overflow: hidden;
-  transition: box-shadow 0.3s;
+  margin-bottom: 32px;
 }
 
-.movie-info-tinder {
-  width: 100%;
-  height: 25%;
-  background: linear-gradient(0deg, rgba(0,0,0,0.85) 80%, rgba(0,0,0,0.2) 100%);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 1.5rem 1.5rem 1.2rem 1.5rem;
+.tinder-card-gradient {
   position: absolute;
-  left: 0;
   bottom: 0;
-}
-
-.movie-main-info {
   width: 100%;
-  text-align: left;
-  margin-bottom: 1.2rem;
+  height: 40%;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  display: flex;
+  align-items: flex-end;
 }
 
-.movie-main-info h2 {
+.tinder-card-info {
+  color: #fff;
+  padding: 20px;
+}
+
+.tinder-card-info h2 {
   font-size: 2rem;
   font-weight: 700;
-  margin: 0;
+  margin: 0 0 0.3em 0;
   color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
-.movie-year {
+.tinder-card-info span {
   font-size: 1.1rem;
   font-weight: 400;
-  color: #bdbdbd;
+  color: #ffd700;
 }
 
-.movie-origin {
-  font-size: 1rem;
-  color: #bdbdbd;
-  margin-bottom: 0.2rem;
-}
-
-.movie-genre-rating {
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
+.tinder-card-meta {
   font-size: 1rem;
   color: #e0e0e0;
+  margin-bottom: 0.3em;
 }
 
-.movie-genre {
-  font-size: 1rem;
-  color: #bdbdbd;
-}
-
-.movie-rating {
-  font-size: 1.1rem;
+.tinder-card-rating {
+  font-size: 1.2rem;
   color: #ffd700;
   font-weight: 600;
 }
 
-.movie-actions {
-  width: 100%;
+.tinder-card-actions {
   display: flex;
+  gap: 24px;
+  margin-top: -32px;
   justify-content: center;
-  align-items: center;
-  gap: 2.5rem;
-  margin-top: 0.2rem;
 }
 
-.movie-btn {
-  width: 54px;
-  height: 54px;
+.action-btn {
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
+  font-size: 2rem;
   background: #fff;
-  color: #222;
-  font-size: 1.7rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: transform 0.1s;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
 }
 
-.movie-btn:active {
-  transform: scale(0.92);
-}
-
-.movie-btn.no {
-  color: #ff3a5e;
-}
-.movie-btn.pass {
-  color: #ffb300;
-}
-.movie-btn.yes {
-  color: #1ed760;
-}
-
-.movie-btn.no:hover {
-  background: #ff3a5e;
-  color: #fff;
-}
-.movie-btn.pass:hover {
-  background: #ffb300;
-  color: #fff;
-}
-.movie-btn.yes:hover {
-  background: #1ed760;
-  color: #fff;
-}
+.action-btn.dislike { color: #ff3a5e; }
+.action-btn.like { color: #2ecc71; }
+.action-btn.pass { color: #ffb300; }
+.action-btn:active { transform: scale(0.95); }
 
 @media (max-width: 768px) {
-  .movie-card-tinder {
+  .tinder-card {
+    width: 95vw;
+    height: 60vw;
+    min-height: 320px;
     border-radius: 12px;
   }
-  .movie-main-info h2 {
+  .tinder-card-info h2 {
     font-size: 1.3rem;
   }
-  .movie-info-tinder {
-    padding: 1rem 0.7rem 0.7rem 0.7rem;
+  .tinder-card-info {
+    padding: 1rem;
   }
-  .movie-btn {
+  .action-btn {
     width: 40px;
     height: 40px;
     font-size: 1.2rem;
